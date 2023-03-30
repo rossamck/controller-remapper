@@ -2,7 +2,6 @@ import pygame
 import time
 import socket
 import json
-import pickle
 
 # Load config
 with open("config.json") as config_file:
@@ -44,8 +43,8 @@ try:
 
         # Send data to server
         controller_data = {"buttons": button_data, "axes": axis_data, "hats": hat_data}
-        client_socket.sendall(pickle.dumps(controller_data) + b'\n')
-
+        data_to_send = json.dumps(controller_data).encode() + b'\n'
+        client_socket.sendall(data_to_send)
 
         time.sleep(0.01)
 

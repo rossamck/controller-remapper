@@ -280,28 +280,35 @@ try:
         try:
             received_data = client_socket.recv(1024)
 
-            # Split the data by newline character and remove it
-            received_data = received_data.strip(b'\n')
+            # Split the data by newline character
+            data_parts = received_data.split(b'\n')
 
-            # Deserialize the data using pickle.loads()
-            deserialized_data = pickle.loads(received_data)
+            for data_part in data_parts:
+                # Skip empty parts
+                if not data_part:
+                    continue
 
-            # Access the buttons, axes, and hats data
-            button_data = deserialized_data["buttons"]
-            axis_data = deserialized_data["axes"]
-            hat_data = deserialized_data["hats"]
+                # Deserialize the data using json.loads()
+                deserialized_data = json.loads(data_part.decode())
 
-            # Process controller data
-            process_controller_data(deserialized_data, pressed_keys)
+                # Access the buttons, axes, and hats data
+                button_data = deserialized_data["buttons"]
+                axis_data = deserialized_data["axes"]
+                hat_data = deserialized_data["hats"]
+
+                # Process controller data
+                process_controller_data(deserialized_data, pressed_keys)
 
             time.sleep(0.01)
 
-        except (pickle.UnpicklingError, EOFError) as e:
+        except (json.JSONDecodeError) as e:
             print("Invalid load key encountered, skipping this iteration")
             invalid_data_file.write(f"{e}: {received_data}\n")
             continue
 except KeyboardInterrupt:
     print("Exiting...")
+
+
 
 # Close the sockets
 client_socket.close()
