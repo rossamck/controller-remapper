@@ -55,7 +55,7 @@ button_combination_mapping = {
 }
 
 # Initialize server socket
-server_address = (config["server_ip"], config["server_port"])
+server_address = ("", config["server_port"])
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind(server_address)
 server_socket.listen(1)
@@ -69,7 +69,7 @@ print("Client connected from {}:{}".format(*client_address))
 # Other variables
 pressed_keys = set()
 joystick_deadzone = 0.2
-mouse_sensitivity = 20
+mouse_sensitivity = 10
 trigger_threshold = 0.5
 
 # Windows API mouse input structure
@@ -236,10 +236,13 @@ def process_controller_data(controller_data: dict, pressed_keys: set):
             mouse_action(dx, dy)
 
         # D-pad inputs
-        hat_value = controller_data["hats"][0]
+        hat_value = tuple(controller_data["hats"][0])  # Get the hat value from the nested list and convert it to a tuple
+        # print(f"hat_value: {hat_value}")
         for dpad_direction, dpad_key in dpad_mapping.items():
             key_state = hat_value == dpad_direction
             current_key_state = dpad_key in pressed_keys
+
+            print(f"dpad_direction: {dpad_direction}, key_state: {key_state}")  # Debugging line
 
             if key_state and not current_key_state:
                 print(dpad_key)
@@ -248,6 +251,8 @@ def process_controller_data(controller_data: dict, pressed_keys: set):
             elif not key_state and current_key_state:
                 keyboard.release(dpad_key)
                 pressed_keys.remove(dpad_key)
+
+
 
 
         # Trigger buttons
@@ -295,6 +300,8 @@ try:
                 button_data = deserialized_data["buttons"]
                 axis_data = deserialized_data["axes"]
                 hat_data = deserialized_data["hats"]
+
+                # print(hat_data)
 
                 # Process controller data
                 process_controller_data(deserialized_data, pressed_keys)
