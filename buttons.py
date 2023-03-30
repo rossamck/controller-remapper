@@ -1,10 +1,8 @@
 import pygame
 import time
 
-# Initialize pygame
 pygame.init()
 
-# Find the first available joystick
 joystick = None
 for i in range(pygame.joystick.get_count()):
     joystick = pygame.joystick.Joystick(i)
@@ -13,7 +11,6 @@ for i in range(pygame.joystick.get_count()):
 
 if not joystick:
     print("No joystick found!")
-    print("test")
     exit(1)
 
 joystick.init()
@@ -25,32 +22,30 @@ try:
     while True:
         pygame.event.pump()
 
-        # Button inputs
         for button in range(joystick.get_numbuttons()):
             if joystick.get_button(button):
                 print(f"Button {button} is pressed")
 
-        # Trigger buttons
-        print(joystick.get_axis(3))
+        for hat_id in range(joystick.get_numhats()):
+            hat_value = joystick.get_hat(hat_id)
+            if hat_value != (0, 0):
+                print(f"Hat {hat_id} is pressed: {hat_value}")
+
         left_trigger = joystick.get_axis(4)
         right_trigger = joystick.get_axis(5)
 
-        # Left trigger (aim)
         if left_trigger > 0.5 and not left_mouse_pressed:
-            print(left_trigger)
-            print("left mouse down")
+            print(f"Left Trigger {left_trigger}: Pressed")
             left_mouse_pressed = True
         elif left_trigger <= 0.5 and left_mouse_pressed:
-            print("left mouse up")
+            print("Left Trigger: Released")
             left_mouse_pressed = False
 
-        # Right trigger (shoot)
         if right_trigger > 0.5 and not right_mouse_pressed:
-            print(right_trigger)
-            print("right mouse down")
+            print(f"Right Trigger {right_trigger}: Pressed")
             right_mouse_pressed = True
         elif right_trigger <= 0.5 and right_mouse_pressed:
-            print("right mouse up")
+            print("Right Trigger: Released")
             right_mouse_pressed = False
 
         time.sleep(0.01)
@@ -58,5 +53,4 @@ try:
 except KeyboardInterrupt:
     print("Exiting...")
 
-# Quit pygame
 pygame.quit()

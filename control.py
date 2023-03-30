@@ -10,16 +10,16 @@ pygame.init()
 # Key mapping
 key_mapping = {
     0: 'space',      # X button
-    1: 'enter',      # Circle button
-    2: 'shift',      # Square button
-    3: 'alt',        # Triangle button
+    1: 'c',      # Circle button
+    2: 'f',      # Square button
+    3: 'e',        # Triangle button
     4: 'q',          # L1 button
     5: 'shift',          # R1 button
-    6: 'f',          # L2 button
-    7: 'r',          # R2 button
-    8: 'esc',        # Share button
-    9: 'p',          # Options button
-    10: 'z',         # L3 button (left stick press)
+    6: 'tab',          # Share button
+    7: 'esc',          # Options button
+    8: 'ctrl',        # L3
+    9: 't',          # R3
+    # 10: 'z',         # L3 button (left stick press)
     # 11: 'x',         # R3 button (right stick press)
     # 12: 'c',         # PS button
     # 13: 'v',         # Touchpad button
@@ -28,9 +28,22 @@ key_mapping = {
 # Trigger mapping
 trigger_mapping = {
     # 'left': 'left_mouse',
-    'left' : 'left_shift',
-    'right': 'right_mouse',
+    'left' : 'right_mouse',
+    'right': 'left_mouse',
 }
+
+# D-pad mapping
+dpad_mapping = {
+    (-1, 0): 'left_arrow',  # Left D-pad button
+    (1, 0): 'right_arrow',  # Right D-pad button
+    (0, -1): 'down_arrow',  # Down D-pad button
+    (0, 1): 'up_arrow',  # Up D-pad button
+}
+
+button_combination_mapping = {
+    (4, 2): 'x',  # L1 and Square buttons together
+}
+
 
 
 
@@ -97,10 +110,20 @@ def mouse_action(dx=None, dy=None, left_down=False, left_up=False, right_down=Fa
 
 
 def trigger_action(trigger, pressed):
-    if trigger == 'left_mouse':
-        mouse_action(left_down=pressed, left_up=not pressed)
-    elif trigger == 'right_mouse':
-        mouse_action(right_down=pressed, right_up=not pressed)
+    if trigger in ['left_mouse', 'right_mouse']:
+        if trigger == 'left_mouse':
+            mouse_action(left_down=pressed, left_up=not pressed)
+        elif trigger == 'right_mouse':
+            mouse_action(right_down=pressed, right_up=not pressed)
+    else:
+        print(trigger)
+        if pressed and trigger not in pressed_keys:
+            keyboard.press(trigger)
+            pressed_keys.add(trigger)
+        elif not pressed and trigger in pressed_keys:
+            keyboard.release(trigger)
+            pressed_keys.remove(trigger)
+
 
 
 
@@ -113,16 +136,56 @@ try:
     while True:
         pygame.event.pump()
 
+        
         # Button inputs
+        current_pressed_buttons = set()
         for button, key in key_mapping.items():
-            if joystick.get_button(button):
+            key_state = joystick.get_button(button)
+            if key_state:
+                current_pressed_buttons.add(button)
+            else:
+                if button in current_pressed_buttons:
+                    current_pressed_buttons.remove(button)
+
+        # Check for button combinations
+        for button_combo, key in button_combination_mapping.items():
+            if all(button in current_pressed_buttons for button in button_combo):
+                print(f"Button combination {button_combo} is pressed")
                 if key not in pressed_keys:
                     keyboard.press(key)
                     pressed_keys.add(key)
-            else:
-                if key in pressed_keys:
-                    keyboard.release(key)
-                    pressed_keys.remove(key)
+            elif key in pressed_keys:
+                keyboard.release(key)
+                pressed_keys.remove(key)
+
+        # Press and release single button keybinds
+        for button, key in key_mapping.items():
+            key_state = joystick.get_button(button)
+            current_key_state = key in pressed_keys
+
+            combo_key_used = False
+            for combo, combo_key in button_combination_mapping.items():
+                if button in combo:
+                    if all(b in current_pressed_buttons for b in combo):
+                        combo_key_used = True
+                        break
+
+            if key_state and not ww:
+                if not combo_key_used:
+                    print(key)
+                    keyboard.press(key)
+                    pressed_keys.add(key)
+                elif combo_key_used and all(b not in current_pressed_buttons for b in combo):
+                    keyboard.release(combo_key)
+                    pressed_keys.remove(combo_key)
+
+            elif not key_state and current_key_state and not combo_key_used:
+                keyboard.release(key)
+                pressed_keys.remove(key)
+
+
+
+
 
         # Left analog stick
         left_x_axis = joystick.get_axis(0)
@@ -173,21 +236,19 @@ try:
             dy = int(right_y_axis * mouse_sensitivity)
             mouse_action(dx, dy)
         
-
         # D-pad inputs
         hat_value = joystick.get_hat(0)
-        if hat_value[0] == -1:
-            # Left D-pad button pressed
-            pass
-        elif hat_value[0] == 1:
-            # Right D-pad button pressed
-            pass
-        if hat_value[1] == -1:
-            # Down D-pad button pressed
-            pass
-        elif hat_value[1] == 1:
-            # Up D-pad button pressed
-            pass
+        for dpad_direction, dpad_key in dpad_mapping.items():
+            key_state = hat_value == dpad_direction
+            current_key_state = dpad_key in pressed_keys
+
+            if key_state and not current_key_state:
+                print(dpad_key)
+                keyboard.press(dpad_key)
+                pressed_keys.add(dpad_key)
+            elif not key_state and current_key_state:
+                keyboard.release(dpad_key)
+                pressed_keys.remove(dpad_key)
 
      # Trigger buttons
         left_trigger = joystick.get_axis(4)
