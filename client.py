@@ -1,35 +1,59 @@
+import pygame
+import time
 import socket
 import json
-import pygame
+import pickle
 
 # Load config
-with open("config.json", "r") as f:
-    config = json.load(f)
+with open("config.json") as config_file:
+    config = json.load(config_file)
 
-server_ip = config["server_ip"]
-server_port = config["server_port"]
-
+# Initialize pygame
 pygame.init()
-pygame.joystick.init()
-joystick = pygame.joystick.Joystick(0)
+
+# Set joystick deadzone
+joystick_deadzone = 0.2
+trigger_threshold = 0.5
+
+# Find the first available joystick
+joystick = None
+for i in range(pygame.joystick.get_count()):
+    joystick = pygame.joystick.Joystick(i)
+    if joystick.get_init():
+        break
+
+if not joystick:
+    print("No joystick found!")
+    exit(1)
+
 joystick.init()
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((server_ip, server_port))
+# Connect to the server
+server_address = (config["server_ip"], config["server_port"])
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket.connect(server_address)
 
 try:
     while True:
         pygame.event.pump()
 
-        joystick_state = {
-            'axes': [joystick.get_axis(i) for i in range(joystick.get_numaxes())],
-            'buttons': [joystick.get_button(i) for i in range(joystick.get_numbuttons())],
-            'hats': [joystick.get_hat(i) for i in range(joystick.get_numhats())],
-        }
+        # Collect controller data
+        button_data = [joystick.get_button(i) for i in range(joystick.get_numbuttons())]
+        axis_data = [joystick.get_axis(i) for i in range(joystick.get_numaxes())]
+        hat_data = [joystick.get_hat(i) for i in range(joystick.get_numhats())]
 
-        s.sendall((json.dumps(joystick_state) + '\n').encode())
+        # Send data to server
+        controller_data = {"buttons": button_data, "axes": axis_data, "hats": hat_data}
+        client_socket.sendall(pickle.dumps(controller_data) + b'\n')
+
+
+        time.sleep(0.01)
 
 except KeyboardInterrupt:
     print("Exiting...")
 
-s.close()
+# Close the socket
+client_socket.close()
+
+# Quit pygame
+pygame.quit()

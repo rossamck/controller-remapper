@@ -1,9 +1,21 @@
 import socket
 import json
 import time
-import threading
 import keyboard
 import ctypes
+import sys
+from typing import List
+import pickle
+
+if sys.platform == 'win32':
+    from ctypes import windll
+else:
+    print("This script is designed to work on Windows. Exiting.")
+    sys.exit(1)
+
+# Load config
+with open("config.json") as config_file:
+    config = json.load(config_file)
 
 # Key mapping
 key_mapping = {
@@ -42,14 +54,23 @@ button_combination_mapping = {
     (4, 2): 'x',  # L1 and Square buttons together
 }
 
-# Set joystick deadzone
+# Initialize server socket
+server_address = (config["server_ip"], config["server_port"])
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind(server_address)
+server_socket.listen(1)
+
+print("Server is listening on {}:{}".format(*server_address))
+
+# Wait for a client to connect
+client_socket, client_address = server_socket.accept()
+print("Client connected from {}:{}".format(*client_address))
+
+# Other variables
+pressed_keys = set()
 joystick_deadzone = 0.2
 mouse_sensitivity = 20
 trigger_threshold = 0.5
-
-
-pressed_keys = set()
-
 
 # Windows API mouse input structure
 class MOUSEINPUT(ctypes.Structure):
@@ -63,6 +84,10 @@ class MOUSEINPUT(ctypes.Structure):
 class INPUT(ctypes.Structure):
     _fields_ = [("type", ctypes.c_ulong),
                 ("mi", MOUSEINPUT)]
+
+
+# Import Windows API functions
+# ... (continued from above)
 
 # Import Windows API functions
 SendInput = ctypes.windll.user32.SendInput
@@ -107,84 +132,176 @@ def trigger_action(trigger, pressed):
             keyboard.release(trigger)
             pressed_keys.remove(trigger)
 
-
-
-current_pressed_buttons = set()
-
-def keyPress(joystick_state):
-    global current_pressed_buttons
-
-    # Button inputs
-    new_pressed_buttons = set()
+# Function to process controller data
+def process_controller_data(controller_data: dict, pressed_keys: set):
+    current_pressed_buttons = set()
     for button, key in key_mapping.items():
-        key_state = joystick_state['buttons'][button]
+        key_state = controller_data["buttons"][button]
         if key_state:
-            new_pressed_buttons.add(button)
-
-    pressed_buttons_diff = new_pressed_buttons.symmetric_difference(current_pressed_buttons)
-    for button in pressed_buttons_diff:
-        key = key_mapping[button]
-        if button in new_pressed_buttons:
-            # keyboard.press(key)
-            print(f"Pressed: {key}")
+            current_pressed_buttons.add(button)
         else:
-            print(f"Released: {key}")
+            if button in current_pressed_buttons:
+                current_pressed_buttons.remove(button)
 
-    current_pressed_buttons = new_pressed_buttons
-    
+    # Check for button combinations
+    for button_combo, key in button_combination_mapping.items():
+        if all(button in current_pressed_buttons for button in button_combo):
+            if key not in pressed_keys:
+                print(f"Button combination {button_combo} pressed")  # Modified print statement
+                keyboard.press(key)
+                pressed_keys.add(key)
+        elif key in pressed_keys:
+            print(f"Button combination {button_combo} released")  # Added print statement
+            keyboard.release(key)
+            pressed_keys.remove(key)
 
-server_ip = ""
-server_port = 12345
+    # Press and release single button keybinds
+    for button, key in key_mapping.items():
+        key_state = controller_data["buttons"][button]
+        current_key_state = key in pressed_keys
 
-def handle_client(client_socket, client_address):
-    print(f"Connected to {client_address}")
-    last_print_time = time.time()
-    print_interval = 1  # seconds
-
-    try:
-        trigger_states = {'left_mouse': False, 'right_mouse': False}
-        while True:
-            data = b""
-            while True:
-                packet = client_socket.recv(4096)
-                if not packet:
-                    raise Exception("Client disconnected")
-                data += packet
-                try:
-                    end = data.index(b'\n')
-                    joystick_state = json.loads(data[:end].decode())
-                    data = data[end + 1:]
+        combo_key_used = False
+        for combo, combo_key in button_combination_mapping.items():
+            if button in combo:
+                if all(b in current_pressed_buttons for b in combo):
+                    combo_key_used = True
                     break
-                except (ValueError, IndexError):
-                    continue
 
-            current_time = time.time()
-            if current_time - last_print_time > print_interval:
-                # print(joystick_state)
-                last_print_time = current_time
+        if key_state and not current_key_state:
+            if not combo_key_used:
+                print(f"{key} pressed")  # Modified print statement
+                keyboard.press(key)
+                pressed_keys.add(key)
+            elif combo_key_used and all(b not in current_pressed_buttons for b in combo):
+                keyboard.release(combo_key)
+                pressed_keys.remove(combo_key)
 
-            keyPress(joystick_state)
-           
-            
+        elif not key_state and current_key_state and not combo_key_used:
+            print(f"{key} released")  # Modified print statement
+            keyboard.release(key)
+            pressed_keys.remove(key)
 
-    except Exception as e:
-        print(f"Error: {e}")
 
-    print(f"Connection closed for {client_address}")
-    client_socket.close()
+    # ... (rest of the code using controller_data instead of joystick)
 
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind((server_ip, server_port))
-server_socket.listen(1)
-print(f"Listening for connections...")
 
-while True:
-    try:
-        client_socket, client_address = server_socket.accept()
-        client_handler = threading.Thread(target=handle_client, args=(client_socket, client_address))
-        client_handler.start()
-    except KeyboardInterrupt:
-        print("Shutting down the server...")
-        break
+        # Left analog stick
+        left_x_axis = controller_data["axes"][0]
+        left_y_axis = controller_data["axes"][1]
+        
+        if left_x_axis > joystick_deadzone:
+            if 'd' not in pressed_keys:
+                keyboard.press('d')
+                pressed_keys.add('d')
+        else:
+            if 'd' in pressed_keys:
+                keyboard.release('d')
+                pressed_keys.remove('d')
 
+        if left_x_axis < -joystick_deadzone:
+            if 'a' not in pressed_keys:
+                keyboard.press('a')
+                pressed_keys.add('a')
+        else:
+            if 'a' in pressed_keys:
+                keyboard.release('a')
+                pressed_keys.remove('a')
+
+        if left_y_axis > joystick_deadzone:
+            if 's' not in pressed_keys:
+                keyboard.press('s')
+                pressed_keys.add('s')
+        else:
+            if 's' in pressed_keys:
+                keyboard.release('s')
+                pressed_keys.remove('s')
+
+        if left_y_axis < -joystick_deadzone:
+            if 'w' not in pressed_keys:
+                keyboard.press('w')
+                pressed_keys.add('w')
+        else:
+            if 'w' in pressed_keys:
+                keyboard.release('w')
+                pressed_keys.remove('w')
+
+
+        # Right analog stick for mouse movement
+        right_x_axis = controller_data["axes"][2]
+        right_y_axis = controller_data["axes"][3]
+
+        if abs(right_x_axis) > joystick_deadzone or abs(right_y_axis) > joystick_deadzone:
+            dx = int(right_x_axis * mouse_sensitivity)
+            dy = int(right_y_axis * mouse_sensitivity)
+            mouse_actionw(dx, dy)
+
+        # D-pad inputs
+        hat_value = controller_data["hats"][0]
+        for dpad_direction, dpad_key in dpad_mapping.items():
+            key_state = hat_value == dpad_direction
+            current_key_state = dpad_key in pressed_keys
+
+            if key_state and not current_key_state:
+                print(dpad_key)
+                keyboard.press(dpad_key)
+                pressed_keys.add(dpad_key)
+            elif not key_state and current_key_state:
+                keyboard.release(dpad_key)
+                pressed_keys.remove(dpad_key)
+
+
+        # Trigger buttons
+        left_trigger = controller_data["axes"][4]
+        right_trigger = controller_data["axes"][5]
+
+        # Left trigger (aim)
+        if left_trigger > trigger_threshold and not trigger_states['left_mouse']:
+            trigger_states['left_mouse'] = True
+            trigger_action(trigger_mapping['left'], True)
+        elif left_trigger <= trigger_threshold and trigger_states['left_mouse']:
+            trigger_states['left_mouse'] = False
+            trigger_action(trigger_mapping['left'], False)
+
+        # Right trigger (shoot)
+        if right_trigger > trigger_threshold and not trigger_states['right_mouse']:
+            trigger_states['right_mouse'] = True
+            trigger_action(trigger_mapping['right'], True)
+        elif right_trigger <= trigger_threshold and trigger_states['right_mouse']:
+            trigger_states['right_mouse'] = False
+            trigger_action(trigger_mapping['right'], False)
+
+
+
+try:
+    trigger_states = {'left_mouse': False, 'right_mouse': False}
+
+    while True:
+        try:
+            received_data = client_socket.recv(1024)
+
+            # Split the data by newline character and remove it
+            received_data = received_data.strip(b'\n')
+
+            # Deserialize the data using pickle.loads()
+            deserialized_data = pickle.loads(received_data)
+
+            # Access the buttons, axes, and hats data
+            button_data = deserialized_data["buttons"]
+            axis_data = deserialized_data["axes"]
+            hat_data = deserialized_data["hats"]
+
+            # Process controller data
+            process_controller_data(deserialized_data, pressed_keys)
+
+            time.sleep(0.01)
+
+        except pickle.UnpicklingError:
+            print("Invalid load key encountered, skipping this iteration")
+
+except KeyboardInterrupt:
+    print("Exiting...")
+
+# Close the sockets
+client_socket.close()
 server_socket.close()
+
