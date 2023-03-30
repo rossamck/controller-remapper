@@ -170,7 +170,7 @@ try:
                         combo_key_used = True
                         break
 
-            if key_state and not ww:
+            if key_state and not current_key_state:
                 if not combo_key_used:
                     print(key)
                     keyboard.press(key)
