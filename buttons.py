@@ -13,6 +13,7 @@ for i in range(pygame.joystick.get_count()):
 
 if not joystick:
     print("No joystick found!")
+    print("test")
     exit(1)
 
 joystick.init()
