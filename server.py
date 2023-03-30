@@ -233,7 +233,7 @@ def process_controller_data(controller_data: dict, pressed_keys: set):
         if abs(right_x_axis) > joystick_deadzone or abs(right_y_axis) > joystick_deadzone:
             dx = int(right_x_axis * mouse_sensitivity)
             dy = int(right_y_axis * mouse_sensitivity)
-            mouse_actionw(dx, dy)
+            mouse_action(dx, dy)
 
         # D-pad inputs
         hat_value = controller_data["hats"][0]
@@ -270,6 +270,7 @@ def process_controller_data(controller_data: dict, pressed_keys: set):
             trigger_states['right_mouse'] = False
             trigger_action(trigger_mapping['right'], False)
 
+invalid_data_file = open("invalid_data.txt", "a")
 
 
 try:
@@ -295,9 +296,10 @@ try:
 
             time.sleep(0.01)
 
-        except pickle.UnpicklingError:
+        except (pickle.UnpicklingError, EOFError) as e:
             print("Invalid load key encountered, skipping this iteration")
-
+            invalid_data_file.write(f"{e}: {received_data}\n")
+            continue
 except KeyboardInterrupt:
     print("Exiting...")
 
