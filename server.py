@@ -242,7 +242,7 @@ def process_controller_data(controller_data: dict, pressed_keys: set):
             key_state = hat_value == dpad_direction
             current_key_state = dpad_key in pressed_keys
 
-            print(f"dpad_direction: {dpad_direction}, key_state: {key_state}")  # Debugging line
+            # print(f"dpad_direction: {dpad_direction}, key_state: {key_state}")  # Debugging line
 
             if key_state and not current_key_state:
                 print(dpad_key)
