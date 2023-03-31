@@ -1,0 +1,29 @@
+{
+    "server_port": 12345,
+    "key_mapping": {
+      "0": "space",
+      "1": "c",
+      "2": "f",
+      "3": "e",
+      "4": "q",
+      "5": "shift",
+      "6": "tab",
+      "7": "esc",
+      "8": "ctrl",
+      "9": "t"
+    },
+    "trigger_mapping": {
+      "left": "right_mouse",
+      "right": "left_mouse"
+    },
+    "dpad_mapping": {
+      "(-1, 0)": "left_arrow",
+      "(1, 0)": "right_arrow",
+      "(0, -1)": "down_arrow",
+      "(0, 1)": "up_arrow"
+    },
+    "button_combination_mapping": {
+      "(4, 2)": "x"
+    }
+  }
+  
